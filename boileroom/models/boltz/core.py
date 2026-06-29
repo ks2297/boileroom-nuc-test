@@ -550,12 +550,26 @@ class Boltz2Core(FoldingAlgorithm):
         headers = []
         msa_paths_dict = msa_paths or {}
         use_msa_server = True
+        molecule_types = None
         if config is not None:
             use_msa_server = bool(config.get("use_msa_server", True))
+            # Per-chain entity types, indexed to the same chain split order. When absent,
+            # every chain defaults to "protein" so existing protein behaviour is unchanged.
+            molecule_types = config.get("molecule_types")
 
         for idx, seq in enumerate(chains):
             chain_name = chr(65 + idx)  # A, B, C...
-            # If MSA path is provided for this sequence, inject it into the header
+            entity_type = "protein"
+            if molecule_types is not None and idx < len(molecule_types):
+                entity_type = molecule_types[idx]
+
+            if entity_type != "protein":
+                # Nucleic acids (and other non-protein entities) take no MSA.
+                headers.append(f">{chain_name}|{entity_type}")
+                headers.append(seq)
+                continue
+
+            # Protein: unchanged behaviour (MSA path / single-sequence "empty" / bare protein header).
             if seq in msa_paths_dict:
                 msa_path = msa_paths_dict[seq]
                 # Use absolute path to ensure Boltz2 can resolve it
